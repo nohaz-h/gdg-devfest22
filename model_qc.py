@@ -1,26 +1,18 @@
 import cv2
 import os
-
-# Prepare frame labelling function
-def label_frame(frame_no):
-    if 1 <= frame_no <= 196:
-        return '1984'
-    if 218 <= frame_no <= 413:
-        return 'donkey'
-    if 441 <= frame_no <= 598:
-        return 'digital'
-    if 613 <= frame_no <= 826:
-        return 'rig'
-    if 846 <= frame_no <= 1050:
-        return 'monument'
-    return 'background'
+import numpy as np
+from tensorflow import keras
 
 # main function
 if __name__ == '__main__':
-    vidfile = 'data/videos/for_training.mp4'
-    outdir = 'data/images/train'
+    vidfile = 'data/videos/for_demo.mp4'
     source = cv2.VideoCapture(vidfile)
-    
+
+    # Load model and labels
+    model = keras.models.load_model('./data/model/mymodel.h5')
+    with open('./data/model/mymodel.txt', 'r') as l:
+        labels = l.read().split('\n')[:-1]
+
     # Read first image from video feed
     success, image = source.read()
     frame_count = 0
@@ -31,7 +23,6 @@ if __name__ == '__main__':
         # Rotate 180 degrees
         image = cv2.rotate(image, cv2.ROTATE_180)
         frame_count += 1
-        outfile = f'img_{frame_count:04d}.jpg'
     
         # Center crop image
         image_crop = image[
@@ -43,17 +34,25 @@ if __name__ == '__main__':
         # Resize to 224 x 224
         image_small = cv2.resize(image_crop, (224, 224))
     
-        # label current frame
-        label = label_frame(frame_count)
-        subdir = outdir + '/' + label
+        # Create empty canvas
+        canvas = np.ones(shape=(500, 500, 3))
 
-        # create directory if not exist
-        os.makedirs(outdir + '/' + label) if not os.path.exists(subdir) else None
-    
-        # Write image to disk
-        cv2.imwrite(subdir + '/' + outfile, image_small)
-        print (f'... writing {outfile}')
-        cv2.imshow('out', image_small)
+        pred = model.predict(image_small.reshape(1, 224, 224, 3) / 255., verbose=False)
+
+        # Insert video feed into canvas
+        canvas[50:50 + 224, 50:50 + 224, :] = image_small / 255.
+
+        for i, (label, prob) in enumerate(zip(labels, pred.flatten())):
+            pt1 = (250, 300 + i * 30)
+            pt2 = (250 + int(100 * prob), 300 + i * 30)
+            canvas = cv2.line(canvas, pt1, pt2, (255, 128, 0), 10)
+            outtext = f'{label} ({prob*100:3.0f}%)'
+            cv2.putText(canvas, outtext, (50, 300 + i * 30), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,0), 2, cv2.LINE_AA)
+
+
+
+        # Show canvas
+        cv2.imshow('out', canvas)
         
         # Listen to keypress
         keypress = cv2.waitKey(1000 // 60)
@@ -62,7 +61,6 @@ if __name__ == '__main__':
         if keypress == 32: # Spacebar key
             cv2.waitKey(0)
     
-        print (f'Reading frame {frame_count + 1}')
         success, image = source.read()
     
     

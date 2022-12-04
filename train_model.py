@@ -1,4 +1,3 @@
-from collections import Counter
 import os
 import cv2
 import numpy as np
@@ -17,7 +16,6 @@ def fcn(n_classes):
         layers.Conv2D(64, (3, 3), activation='relu'),
         layers.MaxPool2D((3,3)),
         layers.Conv2D(128, (7, 7), activation='relu'),
-        layers.Dropout(0.5),
         layers.Conv2D(128, (1, 1), activation='relu'),
         layers.Conv2D(n_classes, (1, 1), activation='sigmoid')
     ])
@@ -71,7 +69,8 @@ def multilabel_statistics(yact, ypred, labels):
             for l in likely:
                 obs[act_index, l] += 1
 
-    print(obs)
+    for row, label in zip(obs, labels):
+        print (f'{label:20} {row} ')
 
     return obs
 
@@ -107,3 +106,8 @@ if __name__ == '__main__':
 
     multilabel_statistics(ytest, ypred, unique_labels)
 
+    # Save model
+    model.save('./data/model/mymodel.h5')
+    # Save label
+    with open('data/model/mymodel.txt', 'w') as f:
+        [f.write(f'{i}\n') for i in unique_labels]
